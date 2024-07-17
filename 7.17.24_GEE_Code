@@ -1,0 +1,81 @@
+// Use the NASA NEX-DCP30 dataset to create a visualization of projected
+// climate at bus stops in LA
+// https://cds.nasa.gov/wp-content/uploads/2014/04/NEX-DCP30_Tech_Note_v0.pdf
+// http://www.nasa.gov/content/nasa-supercomputer-generates-closer-look-at-future-climate-conditions-in-us
+
+// Load the NASA NEX-DCP30 dataset
+var imgCol = ee.ImageCollection('NASA/NEX-DCP30_ENSEMBLE_STATS')
+    .select(['tasmax_median']) // Select only maximum temperature median
+    .filterDate('2010-01-01', '2100-01-01'); // Filter date range
+
+// Get the geometry of the image collection
+var datasetBounds = imgCol.geometry();
+
+// Center the map on the dataset bounds
+Map.centerObject(datasetBounds, 2);
+
+// Add the dataset bounds to the map
+Map.addLayer(datasetBounds, {color: 'red'}, 'NASA NEX-DCP30 Coverage');
+
+// Temperature at Bus Stops in Los Angeles
+
+// Load your bus stops data from the uploaded CSV
+var busStopsTable = ee.FeatureCollection('projects/ee-manea/assets/gee_data'); // Update with your asset ID
+
+// Filter bus stops for Southeast Los Angeles
+var roi = ee.Geometry.Rectangle([-118.28, 33.90, -118.18, 34.05]); // Example bounding box for Southeast LA
+var busStopsSELA = busStopsTable.filterBounds(roi);
+
+// Print number of bus stops in the region to the console
+print('Number of Bus Stops:', busStopsSELA.size());
+
+// Define a function to style bus stops based on network
+var styleBusStops = function(feature) {
+  var network = ee.String(feature.get('network')); // Assuming 'network' is a column in your CSV
+  var color = network.match('network1') ? 'blue' :
+              network.match('network2') ? 'green' :
+              'red'; // Example colors for different networks
+  return feature.set('style', {color: color, pointRadius: 5});
+};
+
+// Apply styling to bus stops
+var styledBusStops = busStopsSELA.map(styleBusStops);
+
+// Add bus stops to the map with styled colors
+Map.addLayer(styledBusStops.draw({
+  color: 'style.color', // Extract color from the 'style' property
+  pointRadius: 'style.pointRadius' // Extract point radius from the 'style' property
+}), {}, 'Bus Stops in Southeast LA');
+
+Map.centerObject(roi, 12);
+
+// Compute temporal statistics (mean) for temperature
+var tempTimeSeries = imgCol.map(function(image) {
+  var tempStats = image.reduceRegion({
+    reducer: ee.Reducer.mean(),
+    geometry: roi,
+    scale: 200,
+    bestEffort: true,
+  });
+  var date = image.date().format('YYYY-MM-dd');
+  return ee.Feature(null, {
+    'date': date,
+    'temperature_mean': tempStats.get('tasmax_median')
+  });
+});
+
+// Chart: Temperature increase over the years
+var chart = ui.Chart.feature.byFeature(tempTimeSeries, 'date', ['temperature_mean'])
+    .setChartType('LineChart')
+    .setOptions({
+      title: 'Temperature Increase Over the Years',
+      vAxis: {title: 'Temperature (Celsius)'},
+      hAxis: {title: 'Year'},
+      lineWidth: 2,
+      pointSize: 3,
+      series: {
+        0: {color: 'red'}
+      }
+    });
+
+print(chart);

@@ -3,6 +3,8 @@
 // https://cds.nasa.gov/wp-content/uploads/2014/04/NEX-DCP30_Tech_Note_v0.pdf
 // http://www.nasa.gov/content/nasa-supercomputer-generates-closer-look-at-future-climate-conditions-in-us
 
+// Using http://overpass-turbo.eu/#, to get LA bus stop data
+
 // Load the NASA NEX-DCP30 dataset
 var imgCol = ee.ImageCollection('NASA/NEX-DCP30_ENSEMBLE_STATS')
     .select(['tasmax_median']) // Select only maximum temperature median
